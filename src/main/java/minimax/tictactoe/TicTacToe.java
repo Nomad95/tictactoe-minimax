@@ -48,8 +48,15 @@ public class TicTacToe {
                 Node newNode = new Node(newBoard, node.getPlayer(), i, j);
                 node.addChild(newNode);
 
-                //rekurencyjnie szukamy kolejnych ruchów
-                generateNextMoves(newNode, Player.getNextPlayer(player));
+                BoardChecker boardChecker = new BoardChecker();
+                Player winningPlayer = boardChecker.getWinningPlayer(newBoard);
+
+                //wygeneruj kolejny ruch w rundzie jeśli gra nie jest jeszcze rozstrzygnięta
+                //jesli na danym ruchu wygrywa jeden z graczy, nie generujmy dalej wgłąb
+                if (winningPlayer == null) {
+                    //rekurencyjnie szukamy kolejnych ruchów
+                    generateNextMoves(newNode, Player.getNextPlayer(player));
+                }
             }
         }
 
@@ -110,7 +117,7 @@ public class TicTacToe {
             return bestNode;
         }
 
-        private Integer minimax(Node node, boolean maximization, int depth) {
+        private MinimaxScore minimax(Node node, boolean maximization, int depth) {
             //wezel koncowy - wyliczamy wartosc
             if (node.isLeafNode()) {
                 if (depth == 0) {
@@ -120,42 +127,84 @@ public class TicTacToe {
                 BoardChecker boardChecker = new BoardChecker();
                 Player winningPlayer = boardChecker.getWinningPlayer(node.getBoard());
                 if (winningPlayer == null) {
-                    return 0;
+                    return new MinimaxScore(0);
                 }
                 if (winningPlayer == maximizer) {
-                    return MAX_VALUE - depth;
+                    return new MinimaxScore(MAX_VALUE - depth, depth);
                 }
                 if (winningPlayer != maximizer) {
-                    return MIN_VALUE + depth;
+                    return new MinimaxScore(MIN_VALUE + depth, depth);
                 }
             }
 
+            //szukany najlepszy wezel
             Node foundNode = null;
+            //do wyszukiwania najwiekszej/najmniejszej ilosci krokow do wygranej/przegranej
+            int winningDepth = maximization ? MAX_VALUE : MIN_VALUE;
+            //do wyszukiwania najwiekszej/najmniejszej ilosci punktow
             int nodeValue = maximization ? Integer.MIN_VALUE : Integer.MAX_VALUE;
 
             for (Node child : node.getChildren()) {
-                Integer childNodeValue = minimax(child, !maximization, depth + 1);
+                MinimaxScore childScore = minimax(child, !maximization, depth + 1);
 
+                Integer childNodeValue = childScore.getScore();
                 if (maximization) {
                     if (childNodeValue > nodeValue) {
                         nodeValue = childNodeValue;
                         foundNode = child;
+                    }
+                    //jesli trafi się drugi wygrany węzeł, preferuj ten w ktorym wygrana bedzie w mniejszej ilosci krokow
+                    if (childNodeValue == nodeValue && childScore.getWinningDepth() < winningDepth) {
+                        nodeValue = childNodeValue;
+                        foundNode = child;
+                        winningDepth = childScore.getWinningDepth();
                     }
                 } else {
                     if (childNodeValue < nodeValue) {
                         nodeValue = childNodeValue;
                         foundNode = child;
                     }
+                    //jesli trafi się drugi przegrany węzeł, preferuj ten w ktorym wygrana przeciwnika bedzie w jak najwiekszej ilosci krokow
+                    if (childNodeValue == nodeValue && childScore.getWinningDepth() > winningDepth) {
+                        nodeValue = childNodeValue;
+                        foundNode = child;
+                        winningDepth = childScore.getWinningDepth();
+                    }
                 }
             }
 
             if (depth > 0) {
-                return nodeValue;
+                return new MinimaxScore(nodeValue, winningDepth);
             } else {
                 bestNode = foundNode;
             }
 
             return null;
+        }
+    }
+
+    /**
+     * Klasa ktora zwraca wynik minimax (punkty) oraz glebokosc w ktorej zanotowana byla wygrana jednego z graczy
+     */
+    static class MinimaxScore {
+        private int score;
+        private int winningDepth = 100;
+
+        public MinimaxScore(int score) {
+            this.score = score;
+        }
+
+        public MinimaxScore(int score, int winningDepth) {
+            this.score = score;
+            this.winningDepth = winningDepth;
+        }
+
+        public int getScore() {
+            return score;
+        }
+
+        public int getWinningDepth() {
+            return winningDepth;
         }
     }
 
